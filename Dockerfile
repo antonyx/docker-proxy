@@ -1,12 +1,11 @@
-FROM alpine:edge
+FROM alpine:latest
 
-RUN apk --no-cache add squid tor privoxy ca-certificates && \
+RUN apk --no-cache add squid tor privoxy ca-certificates apache2-utils && \
     ln -sf /dev/stdout /var/log/privoxy/logfile && \
     chown -R squid:squid /var/cache/squid && \
     chown -R squid:squid /var/log/squid
-
 COPY service /opt/
 
-EXPOSE 8888
+CMD ["/opt/entrypoint.sh"]
 
-CMD ["/bin/sh", "/opt/start.sh"]
+EXPOSE 8888

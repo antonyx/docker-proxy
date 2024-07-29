@@ -3,13 +3,41 @@
 # Remove possible pid
 rm /var/run/squid.pid 2>/dev/null
 
+: ${PROXY_AUTH:=1}
+: ${PROXY_USER:="proxy"}
+: ${PROXY_PASS:=""}
+if [ ${PROXY_AUTH} -eq 1 ]; then
+    sed -ie s@".*include /opt/squid/auth.conf"@"include /opt/squid/auth.conf"@ /opt/squid/squid.conf
+    if [ ! -f "/opt/squid/passwd" ]; then
+        if [ -z "${PROXY_PASS}" ]; then
+            PROXY_PASS="password"
+            echo "Set proxy user ${PROXY_USER} password ${PROXY_PASS}"
+        fi
+        htpasswd -b -c /opt/squid/passwd ${PROXY_USER} ${PROXY_PASS}
+    fi
+fi
+
+: ${ALLOW_LOCALNET:=0}
+if [ ${ALLOW_LOCALNET} -eq 1 ]; then
+    echo "Allowing localnet"
+    sed -ie s@".*http_access allow localnet"@"http_access allow localnet"@ /opt/squid/squid.conf
+fi
+
+if [ "$NO_LOG" ]; then
+    printf "\ncache_log /dev/null\naccess_log=none\n" >> /opt/squid/squid.conf
+    echo "Logging disabled"
+fi
+if [ "${NO_CACHE}" ]; then
+    echo "include /opt/squid/no_cache.conf" >> /opt/squid/squid.conf
+else
+    # Create cache directories
+    echo "Initializing Squid cache ..."
+    squid -Nz -f /opt/squid/squid.conf
+fi
+
 # Logging
 tail -F /var/log/squid/cache.log 2>/dev/null &
 tail -F /var/log/squid/access.log 2>/dev/null &
-
-# Create cache directories
-echo "Initializing Squid cache..."
-squid -Nz -f /opt/squid/squid.conf
 
 # Rotate logs ~horly
 (while true; do sleep 3600; squid -k rotate; done) &
